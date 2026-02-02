@@ -1,0 +1,126 @@
+name: Create Release
+
+on:
+    push:
+        tags:
+            - "v*.*.*"
+
+permissions:
+    contents: write
+
+jobs:
+    validate:
+        name: Validate Scripts
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+
+            - name: Install shellcheck
+              run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+            - name: Validate setup.sh
+              run: shellcheck setup.sh
+
+            - name: Test script syntax
+              run: bash -n setup.sh
+
+    release:
+        name: Create Release
+        needs: validate
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - name: Generate checksums
+              run: |
+                  sha256sum setup.sh > setup.sh.sha256
+                  if [ -f install.sh ]; then
+                    sha256sum install.sh > install.sh.sha256
+                  fi
+
+                  # Display checksums for verification
+                  echo "Generated checksums:"
+                  cat *.sha256
+
+            - name: Extract version from tag
+              id: version
+              run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+            - name: Generate changelog
+              id: changelog
+              run: |
+                  # Get previous tag
+                  PREVIOUS_TAG=$(git describe --abbrev=0 --tags ${GITHUB_REF}^ 2>/dev/null || echo "")
+
+                  if [ -z "$PREVIOUS_TAG" ]; then
+                    echo "First release - no previous tag"
+                    CHANGELOG="Initial release"
+                  else
+                    echo "Generating changelog from $PREVIOUS_TAG to ${{ steps.version.outputs.VERSION }}"
+                    CHANGELOG=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+                  fi
+
+                  # Save to file for release notes
+                  cat > release_notes.md << EOF
+                  ## What's Changed
+
+                  $CHANGELOG
+
+                  ## Installation
+
+                  ### Quick Install (One-liner)
+                  \`\`\`bash
+                  curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/setup.sh | sudo bash
+                  \`\`\`
+
+                  ### Verified Install (Recommended)
+                  \`\`\`bash
+                  # Download script and checksum
+                  curl -fsSL -O https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/setup.sh
+                  curl -fsSL -O https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/setup.sh.sha256
+
+                  # Verify checksum
+                  sha256sum -c setup.sh.sha256
+
+                  # Run script
+                  chmod +x setup.sh
+                  sudo ./setup.sh
+                  \`\`\`
+
+                  ## Checksums
+
+                  \`\`\`
+                  $(cat setup.sh.sha256)
+                  \`\`\`
+
+                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${{ steps.version.outputs.VERSION }}
+                  EOF
+
+                  cat release_notes.md
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  name: Release ${{ steps.version.outputs.VERSION }}
+                  body_path: release_notes.md
+                  files: |
+                      setup.sh
+                      setup.sh.sha256
+                      install.sh
+                      install.sh.sha256
+                  draft: false
+                  prerelease: ${{ contains(steps.version.outputs.VERSION, 'rc') || contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'alpha') }}
+                  generate_release_notes: false
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Update latest tag
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git tag -fa latest -m "Latest release: ${{ steps.version.outputs.VERSION }}"
+                  git push origin latest --force
