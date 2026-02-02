@@ -19,11 +19,11 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
-      - name: Validate setup.sh
-        run: shellcheck setup.sh
+      - name: Validate config.sh
+        run: shellcheck config.sh
 
       - name: Test script syntax
-        run: bash -n setup.sh
+        run: bash -n config.sh
 
   release:
     name: Create Release
@@ -37,10 +37,7 @@ jobs:
 
       - name: Generate checksums
         run: |
-          sha256sum setup.sh > setup.sh.sha256
-          if [ -f install.sh ]; then
-            sha256sum install.sh > install.sh.sha256
-          fi
+          sha256sum config.sh > config.sh.sha256
 
           # Display checksums for verification
           echo "Generated checksums:"
@@ -94,7 +91,7 @@ jobs:
           ## Checksums
 
           \`\`\`
-          $(cat setup.sh.sha256)
+          $(cat config.sh.sha256)
           \`\`\`
 
           **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${{ steps.version.outputs.VERSION }}
@@ -108,10 +105,8 @@ jobs:
           name: Release ${{ steps.version.outputs.VERSION }}
           body_path: release_notes.md
           files: |
-            setup.sh
-            setup.sh.sha256
-            install.sh
-            install.sh.sha256
+            config.sh
+            config.sh.sha256
           draft: false
           prerelease: ${{ contains(steps.version.outputs.VERSION, 'rc') || contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'alpha') }}
           generate_release_notes: false
