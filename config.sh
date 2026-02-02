@@ -133,10 +133,10 @@ fi
     sleep 0.5
     
     # Adds Wi-Fi credentials with nmcli (NetworkManager CLI)
-    sudo nmcli -p connection add type wifi con-name "TestNetwork" \
-    ifname wlan0 ssid "$ssid" \
-    wifi-sec.key-mgmt wpa-psk \
-    wifi-sec.psk "$wifi_password"
+    # sudo nmcli -p connection add type wifi con-name "TestNetwork" \
+    # ifname wlan0 ssid "$ssid" \
+    # wifi-sec.key-mgmt wpa-psk \
+    # wifi-sec.psk "$wifi_password"
         
     # Placeholder: Apply settings
     sleep 0.5
